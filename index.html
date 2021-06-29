@@ -143,7 +143,7 @@
         resultados.sorts = resultados.sorts.sort(function(a, b) {var g=parseFloat(a.times.elapsed);var h=parseFloat(b.times.elapsed);return g > h ? 1 : g < h ? -1 : 0; });
         
         var htmlResult = resultados.sorts.map(a=>{
-            return `${a.nome} - operações <b>${a.hz}</b>/sec, despendido <b>${a.times.elapsed}</b>ms <br>`
+            return `${a.nome} - operações <b>${a.hz}</b>/seg, despendido <b>${a.times.elapsed}</b>ms <br>`
         })
 
         ChartHook.build('bar-chart-horizontal', resultados.sorts.map(a => {
@@ -186,7 +186,7 @@
             labels: labels,
             datasets: [
               {
-                label: "Tempo despendido ms",
+                label: "Tempo despendido(ms)",
                 backgroundColor: cores,
                 data: datas
               }
