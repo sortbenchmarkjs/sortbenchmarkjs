@@ -1,0 +1,487 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+  <meta charset="UTF-8" />
+  <title>SORT BENCHMARK</title>
+  <meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+
+  <!-- https://developer.mozilla.org/en-US/docs/Web/HTTP/CSP -->
+  <!-- <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'" />
+  <meta http-equiv="X-Content-Security-Policy" content="default-src 'self'; script-src 'self'" /> -->
+  <link rel="stylesheet" href="./dist/plugins/semantic/semantic.min.css">
+
+</head>
+
+<body>
+  <style type="text/css">
+    body {
+      background-color: #DADADA;
+    }
+
+    body>.grid {
+      height: 100%;
+    }
+
+    .column {
+      max-width: 500px;
+    }
+
+    .content.title {
+      font-size: 32px;
+    }
+
+    #resultado {
+      margin: 3em 0 0 0;
+    }
+  </style>
+  <div class="ui middle aligned center aligned grid">
+    <div class="column">
+      <h2 class="ui teal image header">
+        <div class="content title">
+          Sort Benchmark
+        </div>
+      </h2>
+      <form class="ui large form">
+        <div class="ui stacked">
+          <div class="field">
+            <select id="select-tipo-sort" class="ui dropdown">
+              <option value="todos">Todos os Sort</option>
+              <option value="bubbleSort">Bubble Sort</option>
+              <option value="selectionSort">Selection Sort</option>
+              <option value="insertionSort">Insertion Sort</option>
+              <option value="quickSort">Quick Sort</option>
+              <option value="mergeSort">Merge Sort</option>
+              <option value="shellSort">Shell Sort</option>
+            </select>
+          </div>
+          <div class="field">
+            <select id="select-tipo-quantidade" class="ui dropdown">
+              <option value="0">Ordenar pequenos volumes</option>
+              <option value="1">Ordenar médios volumes</option>
+              <option value="2">Ordenar grandes volumes</option>
+              <option value="3">Ordenar volumes massivos</option>
+            </select>
+          </div>
+          <div class="field">
+            <div class="ui bottom aligned teal labeled slider"></div>
+          </div>
+          <div id="ligar-benchmark" class="ui fluid large teal submit button">Iniciar</div>
+        </div>
+
+      </form>
+      <div id="resultado" class="ui message">
+
+      </div>
+      <div id="resultado-grafico" class="ui message">
+        <canvas id="bar-chart-horizontal" width="800" height="250"></canvas>
+      </div>
+    </div>
+  </div>
+
+  <!-- You can also require other files to run in this process -->
+  <!-- <script src="./dist/renderer.js"></script> -->
+  <script src="./dist/plugins/jquery/jquery-3.6.0.min.js"></script>
+  <script src="./dist/plugins/semantic/semantic.min.js"></script>
+  <script src="./dist/plugins/benchmark/lodash.js"></script>
+  <script src="./dist/plugins/benchmark/platform.js"></script>
+  <script src="./dist/plugins/benchmark/benchmark.js"></script>
+  <script src="./dist/plugins/chartjs/chartjs.min.js"></script>
+  <script>
+
+    $(document).ready(function () {
+
+      $('.ui.slider').slider({ min: 10, max: 100, start: 45 })
+
+      $('#select-tipo-quantidade').change(function () {
+        switch (parseInt(this.value)) {
+          case 0:
+            $('.ui.slider').slider({ min: 10, max: 100, start: 45, step: 10 })
+            break;
+          case 1:
+            $('.ui.slider').slider({ min: 1000, max: 50000, start: 50, step: 1000 })
+            break;
+          case 2:
+            $('.ui.slider').slider({ min: 100000, max: 500000, start: 50, step: 100000 })
+            break;
+          default:
+            $('.ui.slider').slider({ min: 10000000, max: 50000000, start: 50, step: 10000000 })
+            break;
+        }
+      })
+
+      $('#ligar-benchmark').click(async function () {
+
+        let tipoDeSort = $('#select-tipo-sort').val();
+        const quantidadeDados = $('.ui.slider').slider('get value');
+
+        $(this).addClass('disabled').html('Processando...');
+
+        if (tipoDeSort == "todos") {
+          tipoDeSort = $('#select-tipo-sort option').toArray().map(a => a.value).slice(1);
+        } else {
+          tipoDeSort = [tipoDeSort];
+        }
+
+        let resultados = await BenchmarkHook.init(tipoDeSort, quantidadeDados);
+
+        // resultados
+        var totalTime = resultados.sorts.reduce(function (a, b) {
+          return a + b.times.elapsed;
+        }, 0);
+
+        var totalOperacoes = resultados.sorts.reduce(function (a, b) {
+          return a + b.hz;
+        }, 0);
+
+        ChartHook.build('bar-chart-horizontal', resultados.sorts.map(a => {
+          return {
+            nome: a.nome,
+            valor: a.times.elapsed
+          }
+        }));
+
+        $('#resultado').html(`tempo despendido ${totalTime}ms<br>total de operações ${totalOperacoes}/seg`);
+        $('#ligar-benchmark').removeClass('disabled').html('Iniciar');
+
+      })
+
+    });
+
+    const ChartHook = {
+
+      config: {},
+
+      myChart: null,
+
+      randomColor: function () {
+        return Math.floor(Math.random() * 16777215).toString(16);
+      },
+
+      build: function (divElement, data) {
+
+        if (this.myChart) this.myChart.destroy();
+
+        let labels = data.map(a => a.nome);
+        let datas = data.map(a => a.valor);
+
+        let cores = data.map(a => '#' + this.randomColor());
+
+        this.myChart = new Chart(document.getElementById(divElement), {
+          type: 'bar',
+          data: {
+            labels: labels,
+            datasets: [
+              {
+                label: "Tempo despendido",
+                backgroundColor: cores,
+                data: datas
+              }
+            ]
+          },
+          options: {
+            legend: { display: false },
+            title: {
+              display: false,
+              text: 'Operações por segundos'
+            }
+          }
+        });
+      }
+    }
+
+    const BenchmarkHook = {
+
+      arrayList: [],
+
+      sleep: function (ms) {
+        return new Promise(resolve => setTimeout(resolve, ms));
+      },
+
+      init: async function (tipoDeSort, quantidadeDados) {
+
+        $('#resultado').html('');
+
+        $('#ligar-benchmark').html('Gerando informações...');
+        await this.sleep(1000);
+
+        this.arrayList = Gerador.init(quantidadeDados);
+
+        $('#ligar-benchmark').html('Aplicando ordenação...');
+        await this.sleep(1000);
+
+        return await this.processar(tipoDeSort);
+      },
+
+      processarAntigo: function (tipoDeSort) {
+        Cronometro.start();
+        console.log(Cronometro.time);
+        Sort[tipoDeSort](this.arrayList.slice(0));
+        Cronometro.stop();
+        console.log(`${Cronometro.tempoTotal}ms`);
+        return Cronometro.tempoTotal;
+      },
+
+      processar: async function (tiposDeSort) {
+
+        let suite = new Benchmark.Suite;
+        let totalRegistros = this.arrayList.length;
+        let registros = this.arrayList;
+
+        return new Promise(function (resolve, reject) {
+
+          for (const nomeSort of tiposDeSort) {
+            console.log(`add ${nomeSort}`);
+            suite.add(nomeSort, () => {
+              Sort[nomeSort](registros.slice(0));
+            }, {
+              maxTime: 0.001
+            })
+          }
+
+          suite
+            .on('cycle', function (event) {
+              console.log(String(event.target));
+            })
+            .on('complete', function () {
+              console.log('Fastest is ' + this.filter('fastest').map('name'));
+              console.log(this);
+              resolve({
+                array: totalRegistros,
+                tiposDeSort: this.map(a => {
+                  return a.stats;
+                }),
+                sorts: this.map((method) => {
+                  let methods = {};
+                  methods.nome = method.name;
+                  methods[method.name] = method.stats.mean;
+                  methods.times = method.times;
+                  methods.hz = method.hz;
+                  return methods;
+                })
+              });
+            })
+            .run({ 'async': true });
+
+        })
+      }
+    }
+
+    const Cronometro = {
+
+      time: null,
+
+      tempoTotal: null,
+
+      start: function () {
+        this.time = Date.now();
+      },
+
+      stop: function () {
+        this.tempoTotal = Date.now() - this.time;
+        return this.tempoTotal;
+      }
+
+    }
+
+    const Gerador = {
+
+      init: function (size) {
+
+        let min = 0;
+        let max = size * 10;
+
+        const number = Math.floor(Math.random() * (max - min + 1)) + min;
+
+        let a = [];
+
+        for (let i = 0; i < size; i++) {
+          a.push(this.random(min, max));
+        }
+
+        return a;
+      },
+
+      random: function (min, max) {
+
+        return Math.floor(Math.random() * (max - min + 1)) + min;
+
+      }
+
+    }
+
+    const Sort = {
+
+      swap: function (ary, a, b) {
+        var t = ary[a];
+        ary[a] = ary[b];
+        ary[b] = t;
+      },
+
+      intercambio: function (array, i, j) {
+        let tmp = array[i];
+        array[i] = array[j];
+        array[j] = tmp;
+      },
+
+      particiona: function (itens, esquerda, direita) {
+        let pivot = itens[Math.floor((direita + esquerda) / 2)],
+          i = esquerda,
+          j = direita;
+
+        while (i <= j) {
+          while (itens[i] < pivot) {
+            i++;
+          }
+          while (itens[j] > pivot) {
+            j--;
+          }
+          if (i <= j) {
+            this.swap(itens, i, j);
+            i++;
+            j--;
+          }
+        }
+        return i;
+      },
+
+      todos: function () {
+
+      },
+
+      shellSort: function (a) {
+
+        let T = a.length;
+
+        let h = 1;
+        while (h < T / 3) h = 3 * h + 1;
+
+        while (h >= 1) {
+          for (let i = h; i < T; i++) {
+            for (let j = i; j >= h && (a[j] < a[j - h]); j -= h) {
+              this.intercambio(a, j, j - h);
+            }
+          }
+          h = Math.floor(h / 3);
+        }
+
+        return a;
+
+      },
+
+      insertionSort: function (a) {
+        for (var i = 1, l = a.length; i < l; i++) {
+          var value = a[i];
+          for (var j = i - 1; j >= 0; j--) {
+            if (a[j] <= value)
+              break;
+            a[j + 1] = a[j];
+          }
+          a[j + 1] = value;
+        }
+        return a;
+
+      },
+
+      quickSort: async function (a) {
+
+        const quickSortRecursivo = async (itens, esquerda, direita) => {
+
+          let index;
+
+          if (itens.length > 1) {
+
+            index = this.particiona(itens, esquerda, direita);
+
+            if (esquerda < index - 1) {
+              return await quickSortRecursivo(itens, esquerda, index - 1);
+            }
+
+            if (index < direita) {
+              return await quickSortRecursivo(itens, index, direita);
+            }
+
+          }
+
+          return itens;
+
+        };
+
+        return await quickSortRecursivo(a, 0, a.length - 1);
+
+      },
+
+      selectionSort: function (a) {
+
+        for (let i = 0; i < a.length; i++) {
+
+          let min = i;
+
+          for (let j = i + 1; j < a.length; j++) {
+            if (a[j] < a[min]) {
+              min = j;
+            }
+          }
+
+          if (min != i) {
+            this.intercambio(a, i, min);
+          }
+        }
+
+        return a;
+
+      },
+
+      mergeSort: function (a) {
+
+        let aux = [];
+
+        const merge = function (a, lo, mid, hi) {
+          let i = lo, j = mid + 1;
+
+          for (let k = lo; k <= hi; k++) {
+            aux[k] = a[k];
+          }
+
+          for (let k = lo; k <= hi; k++) {
+            if (i > mid) a[k] = aux[j++];
+            else if (j > hi) a[k] = aux[i++];
+            else if (aux[j] < aux[i]) a[k] = aux[j++];
+            else a[k] = aux[i++];
+          }
+        };
+
+        const mergeSortRecursivo = function (a, lo, hi) {
+          if (hi <= lo) return;
+          let mid = Math.floor((hi - lo) / 2) + lo;
+          mergeSortRecursivo(a, lo, mid);
+          mergeSortRecursivo(a, mid + 1, hi);
+          merge(a, lo, mid, hi);
+
+          return a;
+        };
+
+        mergeSortRecursivo(a, 0, a.length - 1);
+      },
+
+      bubbleSort: function (a) {
+        var g, b;
+
+        for (g = 0; g < a.length; g++) {
+          for (b = g + 1; b < a.length; b++) {
+            if (a[g] > a[b]) {
+              this.swap(a, g, b);
+            }
+          }
+        }
+
+        return a;
+      }
+
+    }
+
+  </script>
+</body>
+
+</html>
