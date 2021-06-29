@@ -1,5 +1,9 @@
 ### Hi there 👋
 
+Sort Benchmark - Estrutura de dados Univali
+
+Alexandre Machado Azevedo
+
 <!--
 **sortbenchmarkjs/sortbenchmarkjs** is a ✨ _special_ ✨ repository because its `README.md` (this file) appears on your GitHub profile.
 
