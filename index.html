@@ -25,7 +25,7 @@
     }
 
     .column {
-      max-width: 500px;
+      max-width: 350px;
     }
 
     .content.title {
@@ -34,6 +34,11 @@
 
     #resultado {
       margin: 3em 0 0 0;
+    }
+    @media  (min-width:500px) {
+      .column {
+        max-width: 700px;
+      }
     }
   </style>
   <div class="ui middle aligned center aligned grid">
@@ -135,14 +140,21 @@
           return a + b.hz;
         }, 0);
 
+        resultados.sorts = resultados.sorts.sort(function(a, b) {var g=parseFloat(a.times.elapsed);var h=parseFloat(b.times.elapsed);return g > h ? 1 : g < h ? -1 : 0; });
+        
+        var htmlResult = resultados.sorts.map(a=>{
+            return `${a.nome} - operações <b>${a.hz}</b>/sec, despendido <b>${a.times.elapsed}</b>ms <br>`
+        })
+
         ChartHook.build('bar-chart-horizontal', resultados.sorts.map(a => {
           return {
             nome: a.nome,
             valor: a.times.elapsed
-          }
+          } 
         }));
 
-        $('#resultado').html(`tempo despendido ${totalTime}ms<br>total de operações ${totalOperacoes}/seg`);
+        // $('#resultado').html(`tempo despendido ${totalTime}ms<br>total de operações ${totalOperacoes}/seg`);
+        $('#resultado').html(htmlResult);
         $('#ligar-benchmark').removeClass('disabled').html('Iniciar');
 
       })
@@ -202,6 +214,9 @@
       init: async function (tipoDeSort, quantidadeDados) {
 
         $('#resultado').html('');
+        
+        if (ChartHook.myChart)
+          ChartHook.myChart.destroy();
 
         $('#ligar-benchmark').html('Gerando informações...');
         await this.sleep(1000);
